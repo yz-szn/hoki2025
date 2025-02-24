@@ -30,15 +30,22 @@ def read_proxies(file_path):
     
     return proxies
 
-def write_proxies(file_path, proxies):
-    with open(file_path, 'w') as file:
-        for proxy in proxies:
-            file.write(proxy + "\n")
+def read_token_proxy_binding(file_path):
+    if not os.path.exists(file_path):
+        return {}
+    
+    binding = {}
+    with open(file_path, 'r') as file:
+        for line in file.read().splitlines():
+            token, proxy = line.split(":", 1)
+            binding[token] = proxy
+    
+    return binding
 
-def add_used_proxy(proxy):
-    used_proxy_path = os.path.join("data", "used_proxy.txt")
-    with open(used_proxy_path, "a") as file:
-        file.write(proxy + "\n")
+def save_token_proxy_binding(file_path, binding):
+    with open(file_path, 'w') as file:
+        for token, proxy in binding.items():
+            file.write(f"{token}:{proxy}\n")
 
 def generate_random_headers(token=None):
     ua = UserAgent()
@@ -160,6 +167,9 @@ def main():
         return
     
     proxies = read_proxies('data/proxy.txt')
+    binding_path = os.path.join("data", "token_proxy_binding.txt")
+    token_proxy_binding = read_token_proxy_binding(binding_path)
+    
     account_headers = {}
     loop_duration = 24 * 3600
     
@@ -170,11 +180,16 @@ def main():
                 account_headers[token] = generate_random_headers(token)
             
             headers = account_headers[token]
-            proxy_index = idx % len(proxies)
+            proxy = token_proxy_binding.get(token)
+            if not proxy or proxy not in proxies:
+                proxy_index = idx % len(proxies)
+                proxy = proxies[proxy_index]
+                token_proxy_binding[token] = proxy
+                save_token_proxy_binding(binding_path, token_proxy_binding)  
+            
             success = False
             
             while not success:
-                proxy = proxies[proxy_index]
                 log("WalmeBOT", f"Trying proxy: {proxy}", "INFO")
                 profile_data = fetch_profile(token, headers, proxy)
                 
@@ -213,13 +228,17 @@ def main():
                                 log("WalmeBOT", "Task already completed. Skipping...", "INFO")
                         
                         success = True
-                        add_used_proxy(proxy)
-                        proxy_index = (proxy_index + 1) % len(proxies)
                     else:
                         log("WalmeBOT", "Failed to fetch tasks. Trying next proxy...", "ERROR")
                 else:
                     log("WalmeBOT", "Failed to fetch profile data. Trying next proxy...", "ERROR")
-                proxy_index = (proxy_index + 1) % len(proxies)
+                proxy_index = (proxies.index(proxy) + 1 if proxy in proxies else 0)
+                if proxy_index >= len(proxies):
+                    proxy_index = 0
+                proxy = proxies[proxy_index]
+                token_proxy_binding[token] = proxy 
+                save_token_proxy_binding(binding_path, token_proxy_binding) 
+            
             if not success:
                 log("WalmeBOT", "All proxies failed for this account. Moving to the next account.", "ERROR")
             log("WalmeBOT", "━" * 50 + "\n", "INFO")
