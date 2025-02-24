@@ -69,12 +69,23 @@ def generate_random_headers(token=None):
         headers['Authorization'] = f'Bearer {token}'
     return headers
 
+def parse_proxy(proxy):
+    if proxy.startswith("http://") or proxy.startswith("https://"):
+        return {"http": proxy, "https": proxy}
+    elif proxy.startswith("socks4://"):
+        return {"http": proxy, "https": proxy}
+    elif proxy.startswith("socks5://"):
+        return {"http": proxy, "https": proxy}
+    else:
+        return {"http": f"http://{proxy}", "https": f"http://{proxy}"}
+
 def fetch_profile(token, headers, proxy=None):
     url = "https://api.walme.io/user/profile"
     headers['Authorization'] = f'Bearer {token}'
     
     try:
-        response = requests.get(url, headers=headers, proxies={"http": proxy, "https": proxy} if proxy else None, timeout=10)
+        proxies = parse_proxy(proxy) if proxy else None
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
         
         if response.status_code == 200:
             log("WalmeBOT", "Successfully fetched profile data!", "SUCCESS")
@@ -112,7 +123,8 @@ def fetch_all_tasks(token, headers, proxy=None):
     headers['Authorization'] = f'Bearer {token}'
     
     try:
-        response = requests.get(url, headers=headers, proxies={"http": proxy, "https": proxy} if proxy else None, timeout=10)
+        proxies = parse_proxy(proxy) if proxy else None
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=10)
         
         if response.status_code == 200:
             log("WalmeBOT", "Successfully fetched tasks!", "SUCCESS")
@@ -138,7 +150,8 @@ def complete_task(task_id, token, headers, proxy=None):
     data = {}
     
     try:
-        response = requests.patch(url, headers=headers, json=data, proxies={"http": proxy, "https": proxy} if proxy else None, timeout=10)
+        proxies = parse_proxy(proxy) if proxy else None
+        response = requests.patch(url, headers=headers, json=data, proxies=proxies, timeout=10)
         
         if response.status_code == 200:
             log("WalmeBOT", f"Successfully completed task {task_id}!", "SUCCESS")
